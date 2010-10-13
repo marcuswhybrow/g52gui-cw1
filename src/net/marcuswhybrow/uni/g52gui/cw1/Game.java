@@ -48,7 +48,6 @@ public class Game extends JFrame implements ActionListener
 	JLabel missesLabel = new JLabel("MISSES: 0");
 
 	private int numberOfPairs = 20;
-	private int numberOfPairsMatched = 0;
 
 	private enum MatchType {HIT, MISS}
 	
@@ -60,8 +59,6 @@ public class Game extends JFrame implements ActionListener
 		NOTIFY_COMPLETE
 	}
 	private State state = State.WAITING_FOR_FIRST_CARD;
-
-	private File[] images;
 
 	private Timer incorrectMatchTimer;
 
@@ -201,11 +198,12 @@ public class Game extends JFrame implements ActionListener
 		if (firstPickedCard.getPartner() == secondPickedCard)
 		{
 			this.state = State.NOTIFYING_CORRECT_MATCH;
-			this.updateScore(MatchType.HIT);
 
 			firstPickedCard.hasBeenMatched();
 			secondPickedCard.hasBeenMatched();
 			this.clearLimboCards();
+
+			this.updateScore(MatchType.HIT);
 			this.state = State.WAITING_FOR_FIRST_CARD;
 		}
 		else
@@ -226,7 +224,6 @@ public class Game extends JFrame implements ActionListener
 			if (! this.firstPickedCard.isMatched())
 			{
 				this.firstPickedCard.turnTofaceDown();
-				this.numberOfPairsMatched += 1;
 			}
 			this.firstPickedCard = null;
 		}
@@ -311,6 +308,13 @@ public class Game extends JFrame implements ActionListener
 			case HIT:
 				this.hits += 1;
 				this.hitsLabel.setText("HITS: " + Integer.toString(this.hits));
+				if (this.hits == this.numberOfPairs)
+				{
+					for (Card card : this.cards)
+					{
+						card.setBackground(Color.GREEN);
+					}
+				}
 				break;
 			case MISS:
 				this.misses += 1;
