@@ -1,6 +1,7 @@
 package net.marcuswhybrow.uni.g52gui.cw1;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.event.ActionEvent;
@@ -15,9 +16,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
 import javax.imageio.ImageIO;
+import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.Timer;
 
@@ -32,14 +35,22 @@ public class Game extends JFrame implements ActionListener
 	private Card firstPickedCard = null;
 	private Card secondPickedCard = null;
 
-	private JPanel cardsPanel = new JPanel();
-	private JPanel controlsPanel = new JPanel();
+	private JPanel cardPanel = new JPanel();
+	private JPanel bottomPanel = new JPanel();
+
+	private JPanel controlPanel = new JPanel();
+	private JPanel scorePanel = new JPanel();
 
 	JButton solve = new JButton("Solve");
 	JButton shuffle = new JButton("Shuffle");
 
-	private int numberOfPairs = 6;
+	JLabel hitsLabel = new JLabel("HITS: 0");
+	JLabel missesLabel = new JLabel("MISSES: 0");
+
+	private int numberOfPairs = 20;
 	private int numberOfPairsMatched = 0;
+
+	private enum MatchType {HIT, MISS}
 	
 	private enum State {
 		WAITING_FOR_FIRST_CARD,
@@ -52,7 +63,7 @@ public class Game extends JFrame implements ActionListener
 
 	private File[] images;
 
-	private Timer timer;
+	private Timer incorrectMatchTimer;
 
 	private ArrayList<String> imageList = new ArrayList<String>();
 
@@ -60,24 +71,36 @@ public class Game extends JFrame implements ActionListener
 	private String SHUFFLE_ACTION_COMMAND = "shuffle";
 	private String SOLVE_ACTION_COMMAND = "solve";
 
+	/** The number of times in the round a match was detected */
+	private int hits = 0;
+	/** The number of times in the round a miss was detected */
+	private int misses = 0;
+
 	public Game()
 	{
-		timer = new Timer(1000, this);
-		timer.setRepeats(false);
-		timer.setActionCommand(INCORRECT_MATCH_TIMEOUT_ACTION_COMMAND);
+		incorrectMatchTimer = new Timer(1000, this);
+		incorrectMatchTimer.setRepeats(false);
+		incorrectMatchTimer.setActionCommand(INCORRECT_MATCH_TIMEOUT_ACTION_COMMAND);
 
 		this.setLocation(500, 500);
-		this.setSize(200, 300);
+		this.setSize((numberOfPairs/4) * 140, 300);
 		this.setTitle("The Concentration Game");
 		this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		this.setLayout(new BorderLayout());
 
-		this.add(cardsPanel, BorderLayout.CENTER);
-		this.add(controlsPanel, BorderLayout.SOUTH);
+		this.add(cardPanel, BorderLayout.CENTER);
+		this.add(bottomPanel, BorderLayout.SOUTH);
 
-		this.cardsPanel.setLayout(new GridLayout(4, 3));
+		this.cardPanel.setLayout(new GridLayout(4, numberOfPairs/4));
 
-		this.controlsPanel.setLayout(new GridLayout(1, 2));
+		this.bottomPanel.setLayout(new BorderLayout());
+		this.bottomPanel.add(this.controlPanel, BorderLayout.WEST);
+		this.bottomPanel.add(this.scorePanel, BorderLayout.EAST);
+
+		this.controlPanel.setLayout(new GridLayout(1, 2));
+		this.scorePanel.setLayout(new GridLayout(1, 2));
+
+		this.scorePanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 20));
 
 		this.solve.addActionListener(this);
 		this.shuffle.addActionListener(this);
@@ -85,8 +108,11 @@ public class Game extends JFrame implements ActionListener
 		this.solve.setActionCommand(SOLVE_ACTION_COMMAND);
 		this.shuffle.setActionCommand(SHUFFLE_ACTION_COMMAND);
 
-		this.controlsPanel.add(solve);
-		this.controlsPanel.add(shuffle);
+		this.controlPanel.add(solve);
+		this.controlPanel.add(shuffle);
+
+		this.scorePanel.add(hitsLabel);
+		this.scorePanel.add(missesLabel);
 
 		String line;
 		InputStream is = getClass().getClassLoader().getResourceAsStream("images/list.txt");
@@ -175,6 +201,8 @@ public class Game extends JFrame implements ActionListener
 		if (firstPickedCard.getPartner() == secondPickedCard)
 		{
 			this.state = State.NOTIFYING_CORRECT_MATCH;
+			this.updateScore(MatchType.HIT);
+
 			firstPickedCard.hasBeenMatched();
 			secondPickedCard.hasBeenMatched();
 			this.clearLimboCards();
@@ -183,7 +211,11 @@ public class Game extends JFrame implements ActionListener
 		else
 		{
 			this.state = State.NOTIFYING_INCORRECT_MATCH;
-			this.timer.start();
+			this.updateScore(MatchType.MISS);
+
+			// Start the timer in order to wait before flipping the mismatched
+			// cards back over.
+			this.incorrectMatchTimer.start();
 		}
 	}
 
@@ -211,11 +243,13 @@ public class Game extends JFrame implements ActionListener
 
 	private void getNewCards()
 	{
-		this.cardsPanel.removeAll();
+		this.cardPanel.removeAll();
+
+		this.resetScore();
 
 		ArrayList<Card> newCards = new ArrayList<Card>();
 		Random rand = new Random();
-		Image[] imagesToBeUsed = new Image[numberOfPairs];
+		ImageIcon[] imagesToBeUsed = new ImageIcon[numberOfPairs];
 		ArrayList<Integer> indexesUsed = new ArrayList<Integer>();
 		int index;
 
@@ -229,11 +263,12 @@ public class Game extends JFrame implements ActionListener
 			while (indexesUsed.contains(index));
 			indexesUsed.add(index);
 
-			path = "images/" + this.imageList.get(index);
+			String name = this.imageList.get(index);
+			path = "images/" + name;
 			URL url = getClass().getClassLoader().getResource(path);
 			try
 			{
-				imagesToBeUsed[i] = ImageIO.read(url);
+				imagesToBeUsed[i] = new ImageIcon(ImageIO.read(url), name.substring(0, name.length() - 4));
 			}
 			catch (IOException ex)
 			{
@@ -243,9 +278,9 @@ public class Game extends JFrame implements ActionListener
 
 		for (int i = 0; i < numberOfPairs; i++)
 		{
-			ImageIcon icon = new ImageIcon(imagesToBeUsed[i]);
-			Card card1 = new Card(icon);
-			Card card2 = new Card(icon);
+
+			Card card1 = new Card(imagesToBeUsed[i]);
+			Card card2 = new Card(imagesToBeUsed[i]);
 
 			// Tell each card about its partner
 			card1.setPartner(card2);
@@ -262,11 +297,34 @@ public class Game extends JFrame implements ActionListener
 
 		for (Card card : newCards)
 		{
-			this.cardsPanel.add(card);
+			this.cardPanel.add(card);
 			this.cards.add(card);
 		}
 
-		this.cardsPanel.validate();
+		this.cardPanel.validate();
+	}
+
+	private void updateScore(MatchType type)
+	{
+		switch (type)
+		{
+			case HIT:
+				this.hits += 1;
+				this.hitsLabel.setText("HITS: " + Integer.toString(this.hits));
+				break;
+			case MISS:
+				this.misses += 1;
+				this.missesLabel.setText("MISSES: " + Integer.toString(this.misses));
+		}
+	}
+
+	private void resetScore()
+	{
+		this.hits = 0;
+		this.hitsLabel.setText("HITS: 0");
+
+		this.misses = 0;
+		this.missesLabel.setText("MISSES: 0");
 	}
 
 	public static void main(String[] args)

@@ -3,7 +3,6 @@ package net.marcuswhybrow.uni.g52gui.cw1;
 import java.awt.Color;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.border.Border;
 
 /**
  *
@@ -42,6 +41,7 @@ public class Card extends JButton
 		boolean turned = this.state == State.FACEDOWN;
 		this.state = State.FACEUP;
 		this.setIcon(this.icon);
+		this.setToolTipText(icon.getDescription());
 		return turned;
 	}
 
@@ -49,6 +49,7 @@ public class Card extends JButton
 		boolean turned = this.state == State.FACEUP;
 		this.state = State.FACEDOWN;
 		this.setIcon(null);
+		this.setToolTipText(null);
 		return turned;
 	}
 
@@ -66,7 +67,7 @@ public class Card extends JButton
 	{
 		this.state = State.MATCHED;
 		this.setOpaque(true);
-		this.setBackground(Color.red);
+		this.setBackground(Color.RED);
 	}
 
 	public boolean isMatched()
