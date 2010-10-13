@@ -60,7 +60,7 @@ public class Game extends JFrame implements ActionListener
 	}
 	private State state = State.WAITING_FOR_FIRST_CARD;
 
-	private Timer incorrectMatchTimer;
+	private Timer incorrectMatchTimeout;
 
 	private ArrayList<String> imageList = new ArrayList<String>();
 
@@ -75,9 +75,9 @@ public class Game extends JFrame implements ActionListener
 
 	public Game()
 	{
-		incorrectMatchTimer = new Timer(1000, this);
-		incorrectMatchTimer.setRepeats(false);
-		incorrectMatchTimer.setActionCommand(INCORRECT_MATCH_TIMEOUT_ACTION_COMMAND);
+		incorrectMatchTimeout = new Timer(1000, this);
+		incorrectMatchTimeout.setRepeats(false);
+		incorrectMatchTimeout.setActionCommand(INCORRECT_MATCH_TIMEOUT_ACTION_COMMAND);
 
 		this.setLocation(500, 500);
 		this.setSize((numberOfPairs/4) * 140, 300);
@@ -181,6 +181,7 @@ public class Game extends JFrame implements ActionListener
 				case NOTIFYING_INCORRECT_MATCH:
 					if (card.turnToFaceUp())
 					{
+						this.incorrectMatchTimeout.stop();
 						this.clearLimboCards();
 						this.firstPickedCard = card;
 						this.state = State.WAITING_FOR_SECOND_CARD;
@@ -214,7 +215,7 @@ public class Game extends JFrame implements ActionListener
 
 			// Start the timer in order to wait before flipping the mismatched
 			// cards back over.
-			this.incorrectMatchTimer.start();
+			this.incorrectMatchTimeout.restart();
 		}
 	}
 
