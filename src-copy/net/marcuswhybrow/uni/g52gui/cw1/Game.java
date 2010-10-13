@@ -10,10 +10,14 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -216,20 +220,10 @@ public class Game extends JFrame implements ActionListener
 		ArrayList<Card> newCards = new ArrayList<Card>();
 		Random rand = new Random();
 		Image[] imagesToBeUsed = new Image[numberOfPairs];
-		ArrayList<Integer> indexesUsed = new ArrayList<Integer>();
-		int index;
 
 		for (int i = 0; i < numberOfPairs; i++)
 		{
-			String path;
-			do
-			{
-				index = rand.nextInt(this.imageList.size());
-			}
-			while (indexesUsed.contains(index));
-			indexesUsed.add(index);
-
-			path = "images/" + this.imageList.get(index);
+			String path = "images/" + this.imageList.get(rand.nextInt(this.imageList.size()));
 			URL url = getClass().getClassLoader().getResource(path);
 			try
 			{
