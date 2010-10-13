@@ -1,7 +1,9 @@
 package net.marcuswhybrow.uni.g52gui.cw1;
 
 import java.awt.Color;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.border.Border;
 
 /**
  *
@@ -11,26 +13,42 @@ public class Card extends JButton
 {
 	public enum State {FACEDOWN, FACEUP, MATCHED}
 
-	private String name = null;
 	private State state = State.FACEDOWN;
 	private Card partner = null;
+	private ImageIcon icon;
 
-	public Card(String name)
+	public Card(ImageIcon icon)
 	{
-		this.name = name;
+		super();
+		this.icon = icon;
 	}
 
-	public boolean turnTofaceUp() {
+	public String getState()
+	{
+		switch (this.state)
+		{
+			case FACEDOWN:
+				return "FACEDOWN";
+			case FACEUP:
+				return "FACEUP";
+			case MATCHED:
+				return "MATCHED";
+			default:
+				return "";
+		}
+	}
+
+	public boolean turnToFaceUp() {
 		boolean turned = this.state == State.FACEDOWN;
 		this.state = State.FACEUP;
-		this.setText(name);
+		this.setIcon(this.icon);
 		return turned;
 	}
 
 	public boolean turnTofaceDown() {
 		boolean turned = this.state == State.FACEUP;
 		this.state = State.FACEDOWN;
-		this.setText("");
+		this.setIcon(null);
 		return turned;
 	}
 
@@ -47,7 +65,8 @@ public class Card extends JButton
 	public void hasBeenMatched()
 	{
 		this.state = State.MATCHED;
-		this.setForeground(Color.red);
+		this.setOpaque(true);
+		this.setBackground(Color.red);
 	}
 
 	public boolean isMatched()
