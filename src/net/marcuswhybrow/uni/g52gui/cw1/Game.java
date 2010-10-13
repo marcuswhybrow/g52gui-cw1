@@ -97,7 +97,8 @@ public class Game extends JFrame implements ActionListener
 		this.controlPanel.setLayout(new GridLayout(1, 2));
 		this.scorePanel.setLayout(new GridLayout(1, 2));
 
-		this.scorePanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 20));
+		this.scorePanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 30));
+		this.controlPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 0));
 
 		this.solve.addActionListener(this);
 		this.shuffle.addActionListener(this);
