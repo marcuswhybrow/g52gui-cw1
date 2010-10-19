@@ -462,7 +462,6 @@ public class Game extends JFrame implements ActionListener
 			case SOLVED:
 				for (Card card : cards)
 				{
-					System.out.println(card.getState());
 					if (card.getState() != Card.State.MATCHED)
 						card.setBackground(Card.redColour);
 					card.turnToFaceUp();
