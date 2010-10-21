@@ -2,6 +2,7 @@ package net.marcuswhybrow.uni.g52gui.cw1;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
@@ -21,8 +22,6 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.Timer;
-import net.marcuswhybrow.uni.g52gui.cw1.model.GameModel;
-import net.marcuswhybrow.uni.g52gui.cw1.model.ModelListener;
 
 /**
  * The Game class controls the mechanisms of the game and is also the class
@@ -30,8 +29,24 @@ import net.marcuswhybrow.uni.g52gui.cw1.model.ModelListener;
  *
  * @author Marcus Whybrow
  */
-public class Game extends JFrame implements ActionListener, ModelListener
+public class Game extends JFrame implements ActionListener
 {
+	/** The number of pairs of cards (e.g. 10 pairs = 20 cards) */
+	private int numberOfPairs = 10;
+	/** The time in milliseconds to leave non-matched cards FACEUP */
+	private int missTimeoutPeriod = 1000;
+	/** The title of the game window */
+	private String title = "The Concentraiton Game";
+	/** The location of the text file which lists the potential images */
+	private String imageListFile = "images/list.txt";
+	
+	/** A list of all the cards currently in use */
+	private ArrayList<Card> cards = new ArrayList<Card>();
+	/** The first card chosen by the player for a potential match */
+	private Card firstPickedCard = null;
+	/** The second card chosen by the player for a match */
+	private Card secondPickedCard = null;
+
 	/** A panel which holds all the cards in a grid layout */
 	private JPanel cardPanel = new JPanel();
 	/** A panel below the cards which holds the game controls and information */
@@ -44,13 +59,41 @@ public class Game extends JFrame implements ActionListener, ModelListener
 	/** A game controlling button which turns every card faceup */
 	private JButton solve = new JButton("Solve");
 
+	/** The text displayed on the shuffle button in the middle of a game */
+	private String SHUFFLE_NORMAL_TEXT = "Shuffle";
+	/** The text displayed on the shuffle button once a game is over */
+	private String SHUFFLE_RESTART_TEXT = "Start Again";
 	/** A game controlling button which starts the round again with new cards */
-	private JButton shuffle = new JButton(GameModel.SHUFFLE_NORMAL_TEXT);
+	private JButton shuffle = new JButton(SHUFFLE_NORMAL_TEXT);
 
 	/** A label which displays the current number of matches (or hits) */
 	private JLabel hitsLabel = new JLabel("HITS: 0");
 	/** A label which displays the current number of misses */
 	private JLabel missesLabel = new JLabel("MISSES: 0");
+
+	/** The possible outcomes when two cards are selected by the player */
+	private enum MatchType {HIT, MISS}
+
+	/** The possible states which the game may be in */
+	private enum State {
+		// There are no Cards FACEUP whih have not already been MATCHED
+		WAITING_FOR_FIRST_CARD,
+		// There is a single Card FACEUP
+		WAITING_FOR_SECOND_CARD,
+		// A preiod of time where the player sees both the cards but after a
+		// certain period (or if the player continues choosing cards) they
+		// return to being facedown
+		NOTIFYING_INCORRECT_MATCH,
+		// Currently this state transitions into WAITING_FOR_FIRST_CARD
+		// instantly since cards remain on the game surface once MATCHED.
+		NOTIFYING_CORRECT_MATCH,
+		// Showing the player that they have completed the game
+		NOTIFYING_COMPLETE,
+		// The solve button was pressed, the cards must be shuffled to continue
+		SOLVED
+	}
+	/** The state the game is currently in */
+	private State state = State.WAITING_FOR_FIRST_CARD;
 
 	/**
 	 * A swing timer which fires an event a fixed time after an icorrect match
@@ -59,14 +102,34 @@ public class Game extends JFrame implements ActionListener, ModelListener
 	 */
 	private Timer incorrectMatchTimeout;
 
-	private GameModel gameModel = GameModel.get();
-
-	Random rand = new Random();
-
-	/** A list of relative paths to all the images which may be used as graphics
+	/**
+	 * A list of relative paths to all the images which may be used as graphics
 	 * for the cards
 	 */
-	ArrayList<String> imageList = new ArrayList<String>();
+	private ArrayList<String> imageList = new ArrayList<String>();
+
+	/**
+	 * The ActionCommand String used to indicate the incorrect match timeout
+	 * event.
+	 */
+	private String INCORRECT_MATCH_TIMEOUT_ACTION_COMMAND = "incorrect_timeout";
+	/** The ActionCommand String used to indicate the shuffle action */
+	private String SHUFFLE_ACTION_COMMAND = "shuffle";
+	/** The ActionCommand String used to indicate the solve action */
+	private String SOLVE_ACTION_COMMAND = "solve";
+
+	/** The number of times in the round a match was detected */
+	private int hits = 0;
+	/** The number of times in the round a miss was detected */
+	private int misses = 0;
+
+
+	/** A random number generator used to randomly select images for new Cards */
+	Random rand = new Random();
+	/** An array of ImageIcons which will be used used by the new set of Cards */
+	ImageIcon[] imagesToBeUsed;
+	/** A list of which images (by index) have been used thus far, as to avoid duplicates */
+	ArrayList<Integer> indexesUsed;
 
 	/**
 	 * The constructor of the game sets up all the initial values for variables,
@@ -74,15 +137,13 @@ public class Game extends JFrame implements ActionListener, ModelListener
 	 */
 	public Game()
 	{
-		gameModel.addModelListener(this);
-
 		// Set the tile of the window and the size to roughly accomodate the
 		// number of cards in use. Then place the window in the center of the
 		// screen and tell the program to exit when the close button on this
 		// window is clicked.
-		setTitle(gameModel.getTitle());
-		setMinimumSize(gameModel.getMinimumSize());
-		setSize((gameModel.getNumberOfPairs()/4) * 140, 300);
+		setTitle(title);
+		setMinimumSize(new Dimension(400, 200));
+		setSize((numberOfPairs/4) * 140, 300);
 		setLocation(500, 500);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
@@ -97,7 +158,7 @@ public class Game extends JFrame implements ActionListener, ModelListener
 		add(cardPaddingPanel, BorderLayout.CENTER);
 
 		cardPaddingPanel.add(cardPanel, BorderLayout.CENTER);
-		cardPanel.setLayout(new GridLayout(4, gameModel.getNumberOfPairs()/4));
+		cardPanel.setLayout(new GridLayout(4, numberOfPairs/4));
 		cardPanel.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 0, Color.BLACK));
 
 		// Add the panel which will house the controls and stats to the bottom
@@ -115,13 +176,13 @@ public class Game extends JFrame implements ActionListener, ModelListener
 		// Next add the solve button to the controlPanel, set its ActionCommand,
 		// and specify that the Game class is the listener
 		controlPanel.add(solve);
-		solve.setActionCommand(GameModel.SOLVE_ACTION_COMMAND);
+		solve.setActionCommand(SOLVE_ACTION_COMMAND);
 		solve.addActionListener(this);
 
 		// Next add the shuffle button to the controlPanel, set its ActionCommand
 		// and specify that the Game class is the listener
 		controlPanel.add(shuffle);
-		shuffle.setActionCommand(GameModel.SHUFFLE_ACTION_COMMAND);
+		shuffle.setActionCommand(SHUFFLE_ACTION_COMMAND);
 		shuffle.addActionListener(this);
 
 		// Now onto the right had side of the bottom panel add the scorePanel
@@ -139,12 +200,12 @@ public class Game extends JFrame implements ActionListener, ModelListener
 		// Create the timer for flipping non-matched cards back to FACEDOWN
 		// ensuring that it only fires once and does not repeat and settings
 		// the ActionCommand such that the event is discernible from the others
-		incorrectMatchTimeout = new Timer(GameModel.MISS_TIMEOUT_PERIOD, this);
+		incorrectMatchTimeout = new Timer(missTimeoutPeriod, this);
 		incorrectMatchTimeout.setRepeats(false);
-		incorrectMatchTimeout.setActionCommand(GameModel.INCORRECT_MATCH_TIMEOUT_ACTION_COMMAND);
+		incorrectMatchTimeout.setActionCommand(INCORRECT_MATCH_TIMEOUT_ACTION_COMMAND);
 
 		// Get the list of possible images which can be attributed to a Card
-		BufferedReader br = new BufferedReader(new InputStreamReader(getClass().getClassLoader().getResourceAsStream(GameModel.IMAGE_LIST_FILE)));
+		BufferedReader br = new BufferedReader(new InputStreamReader(getClass().getClassLoader().getResourceAsStream(imageListFile)));
 		String line;
 		try
 		{
@@ -177,35 +238,35 @@ public class Game extends JFrame implements ActionListener, ModelListener
 		Object source = e.getSource();
 
 		// The solve button has been pressed
-		if (areEqual(e.getActionCommand(), GameModel.SOLVE_ACTION_COMMAND))
-			changeState(GameModel.State.SOLVED);
+		if (areEqual(e.getActionCommand(), SOLVE_ACTION_COMMAND))
+			changeState(State.SOLVED);
 
 		// The shuffle button has been pressed
-		else if (areEqual(e.getActionCommand(), GameModel.SHUFFLE_ACTION_COMMAND))
+		else if (areEqual(e.getActionCommand(), SHUFFLE_ACTION_COMMAND))
 			getNewCards();
 
 		// The non-matched cards timeout has occurred
-		else if (areEqual(e.getActionCommand(), GameModel.INCORRECT_MATCH_TIMEOUT_ACTION_COMMAND) && gameModel.getState() == GameModel.State.NOTIFYING_INCORRECT_MATCH)
-			changeState(GameModel.State.WAITING_FOR_FIRST_CARD);
+		else if (areEqual(e.getActionCommand(), INCORRECT_MATCH_TIMEOUT_ACTION_COMMAND) && state == State.NOTIFYING_INCORRECT_MATCH)
+			changeState(State.WAITING_FOR_FIRST_CARD);
 
 		// A Card has been chosen
 		else if (source instanceof Card)
 		{
 			Card card = (Card) source;
-			switch (gameModel.getState())
+			switch (state)
 			{
 				case WAITING_FOR_FIRST_CARD:
 					if (card.turnToFaceUp())
 					{
-						gameModel.setFirstPickedCard(card);
-						changeState(GameModel.State.WAITING_FOR_SECOND_CARD);
+						firstPickedCard = card;
+						changeState(State.WAITING_FOR_SECOND_CARD);
 					}
 					break;
 
 				case WAITING_FOR_SECOND_CARD:
 					if (card.turnToFaceUp())
 					{
-						gameModel.setSecondPickedCard(card);
+						secondPickedCard = card;
 						checkChosenCards();
 					}
 					break;
@@ -214,8 +275,8 @@ public class Game extends JFrame implements ActionListener, ModelListener
 					{
 						incorrectMatchTimeout.stop();
 						clearUnmatchedFaceUpCards();
-						gameModel.setFirstPickedCard(card);
-						changeState(GameModel.State.WAITING_FOR_SECOND_CARD);
+						firstPickedCard = card;
+						changeState(State.WAITING_FOR_SECOND_CARD);
 					}
 			}
 		}
@@ -227,10 +288,10 @@ public class Game extends JFrame implements ActionListener, ModelListener
 	 */
 	private void checkChosenCards()
 	{
-		if (gameModel.getFirstPickedCard().getPartner() == gameModel.getSecondPickedCard())
-			changeState(GameModel.State.NOTIFYING_CORRECT_MATCH);
+		if (firstPickedCard.getPartner() == secondPickedCard)
+			changeState(State.NOTIFYING_CORRECT_MATCH);
 		else
-			changeState(GameModel.State.NOTIFYING_INCORRECT_MATCH);
+			changeState(State.NOTIFYING_INCORRECT_MATCH);
 	}
 
 	/**
@@ -238,26 +299,24 @@ public class Game extends JFrame implements ActionListener, ModelListener
 	 */
 	private void clearUnmatchedFaceUpCards()
 	{
-		if (gameModel.getFirstPickedCard() != null)
+		if (firstPickedCard != null)
 		{
-			if (gameModel.getFirstPickedCard().getState() != Card.State.MATCHED)
+			if (firstPickedCard.getState() != Card.State.MATCHED)
 			{
-				gameModel.getFirstPickedCard().turnTofaceDown();
-				gameModel.getFirstPickedCard().setBackground(null);
-				gameModel.modelHasChanged();
+				firstPickedCard.turnTofaceDown();
+				firstPickedCard.setBackground(null);
 			}
-			gameModel.setFirstPickedCard(null);
+			firstPickedCard = null;
 		}
 
-		if (gameModel.getSecondPickedCard() != null)
+		if (secondPickedCard != null)
 		{
-			if (gameModel.getSecondPickedCard().getState() != Card.State.MATCHED)
+			if (secondPickedCard.getState() != Card.State.MATCHED)
 			{
-				gameModel.getSecondPickedCard().setBackground(null);
-				gameModel.getSecondPickedCard().turnTofaceDown();
-				gameModel.modelHasChanged();
+				secondPickedCard.setBackground(null);
+				secondPickedCard.turnTofaceDown();
 			}
-			gameModel.setSecondPickedCard(null);
+			secondPickedCard = null;
 		}
 	}
 
@@ -269,27 +328,24 @@ public class Game extends JFrame implements ActionListener, ModelListener
 	{
 		// Remove any existing cards in the game and reset the game score
 		cardPanel.removeAll();
-		
-		gameModel.getCards().clear();
-		gameModel.modelHasChanged();
-
+		cards.clear();
 		resetScore();
 
 		// Initialise the variables used in the process
-		ImageIcon[] imagesToBeUsed = new ImageIcon[gameModel.getNumberOfPairs()];
-		ArrayList<Integer> indexesUsed = new ArrayList<Integer>();
+		imagesToBeUsed = new ImageIcon[numberOfPairs];
+		indexesUsed = new ArrayList<Integer>();
 		
 		int index;
 		String name, path;
 		URL url;
 
 		// Create a bunch of Image Icons for the Cards
-		for (int i = 0; i < gameModel.getNumberOfPairs(); i++)
+		for (int i = 0; i < numberOfPairs; i++)
 		{
 			// Keep generating random indexes until one is found which has not
 			// been used before
 			do
-				index = rand.nextInt(imageList.size());
+				index = rand.nextInt(this.imageList.size());
 			while (indexesUsed.contains(index));
 			indexesUsed.add(index);
 
@@ -310,7 +366,7 @@ public class Game extends JFrame implements ActionListener, ModelListener
 		}
 
 		// Create the Cards using the ImageIcons just created
-		for (int i = 0; i < gameModel.getNumberOfPairs(); i++)
+		for (int i = 0; i < numberOfPairs; i++)
 		{
 			// Create two Cards, both with the same ImageIcon
 			Card card1 = new Card(imagesToBeUsed[i]);
@@ -325,23 +381,22 @@ public class Game extends JFrame implements ActionListener, ModelListener
 			card2.addActionListener(this);
 
 			// Add the cards to the central list of Cards in the game
-			gameModel.getCards().add(card1);
-			gameModel.getCards().add(card2);
-			gameModel.modelHasChanged();
+			cards.add(card1);
+			cards.add(card2);
 		}
 
 		// Shuffle the the list of Cards such that they can be placed in the
 		// game randomly
-		Collections.shuffle(gameModel.getCards());
+		Collections.shuffle(cards);
 
 		// Now that the Cards are ordered randomly add them to the cardPanel
-		for (Card card : gameModel.getCards())
+		for (Card card : cards)
 			cardPanel.add(card);
 
 		// Since the panel has changed we need to layout the panels components again
 		cardPanel.validate();
 
-		changeState(GameModel.State.WAITING_FOR_FIRST_CARD);
+		changeState(State.WAITING_FOR_FIRST_CARD);
 	}
 
 	/**
@@ -351,19 +406,19 @@ public class Game extends JFrame implements ActionListener, ModelListener
 	 *
 	 * @param type A MatchType enum of HIT or MISS
 	 */
-	private void updateScore(GameModel.MatchType type)
+	private void updateScore(MatchType type)
 	{
 		switch (type)
 		{
 			case HIT:
-				gameModel.setHits(gameModel.getHits() + 1);
-				hitsLabel.setText("HITS: " + Integer.toString(gameModel.getHits()));
-				if (gameModel.getHits() == gameModel.getNumberOfPairs())
-					changeState(GameModel.State.NOTIFYING_COMPLETE);
+				hits += 1;
+				hitsLabel.setText("HITS: " + Integer.toString(hits));
+				if (hits == numberOfPairs)
+					changeState(State.NOTIFYING_COMPLETE);
 				break;
 			case MISS:
-				gameModel.setMisses(gameModel.getMisses() + 1);
-				missesLabel.setText("MISSES: " + Integer.toString(gameModel.getMisses()));
+				misses += 1;
+				missesLabel.setText("MISSES: " + Integer.toString(misses));
 		}
 	}
 
@@ -372,10 +427,10 @@ public class Game extends JFrame implements ActionListener, ModelListener
 	 */
 	private void resetScore()
 	{
-		gameModel.setHits(0);
+		hits = 0;
 		hitsLabel.setText("HITS: 0");
 
-		gameModel.setMisses(0);
+		misses = 0;
 		missesLabel.setText("MISSES: 0");
 	}
 
@@ -392,11 +447,11 @@ public class Game extends JFrame implements ActionListener, ModelListener
 		return str1 != null && str2 != null && str1.equals(str2);
 	}
 
-	private boolean changeState(GameModel.State newState)
+	private boolean changeState(State newState)
 	{
-		boolean changed = newState != gameModel.getState();
+		boolean changed = newState != state;
 
-		gameModel.setState(newState);
+		state = newState;
 
 		switch (newState)
 		{
@@ -405,43 +460,41 @@ public class Game extends JFrame implements ActionListener, ModelListener
 //					card.setEnabled(true);
 				// There is supposed to be no break here
 			case SOLVED:
-				for (Card card : gameModel.getCards())
+				for (Card card : cards)
 				{
 					if (card.getState() != Card.State.MATCHED)
 						card.setBackground(Card.redColour);
 					card.turnToFaceUp();
 				}
 				solve.setEnabled(false);
-				shuffle.setText(GameModel.SHUFFLE_RESTART_TEXT);
+				shuffle.setText(SHUFFLE_RESTART_TEXT);
 				break;
 			case NOTIFYING_CORRECT_MATCH:
-				gameModel.getFirstPickedCard().hasBeenMatched();
-				gameModel.getSecondPickedCard().hasBeenMatched();
+				firstPickedCard.hasBeenMatched();
+				secondPickedCard.hasBeenMatched();
 
 				clearUnmatchedFaceUpCards();
-				updateScore(GameModel.MatchType.HIT);
-				if (gameModel.getState() != GameModel.State.NOTIFYING_COMPLETE)
-					changeState(GameModel.State.WAITING_FOR_FIRST_CARD);
+				updateScore(MatchType.HIT);
+				if (state != State.NOTIFYING_COMPLETE)
+					changeState(State.WAITING_FOR_FIRST_CARD);
 				break;
 			case NOTIFYING_INCORRECT_MATCH:
-				gameModel.getFirstPickedCard().setBackground(Card.redColour);
-				gameModel.getSecondPickedCard().setBackground(Card.redColour);
-				updateScore(GameModel.MatchType.MISS);
+				firstPickedCard.setBackground(Card.redColour);
+				secondPickedCard.setBackground(Card.redColour);
+				updateScore(MatchType.MISS);
 				// Start the timer in order to wait before flipping the mismatched
 				// cards back over.
 				incorrectMatchTimeout.restart();
 				break;
 			case WAITING_FOR_FIRST_CARD:
-				shuffle.setText(GameModel.SHUFFLE_NORMAL_TEXT);
+				shuffle.setText(SHUFFLE_NORMAL_TEXT);
 				clearUnmatchedFaceUpCards();
-				gameModel.setFirstPickedCard(null);
-				gameModel.setSecondPickedCard(null);
+				firstPickedCard = null;
+				secondPickedCard = null;
 				solve.setEnabled(true);
 				break;
 			case WAITING_FOR_SECOND_CARD:
 		}
-
-		gameModel.modelHasChanged();
 
 		return changed;
 	}
@@ -454,12 +507,5 @@ public class Game extends JFrame implements ActionListener, ModelListener
 	public static void main(String[] args)
 	{
 		Game game = new Game();
-	}
-
-	private int count = 0;
-
-	public void modelHasChanged()
-	{
-		System.out.println(count++);
 	}
 }
