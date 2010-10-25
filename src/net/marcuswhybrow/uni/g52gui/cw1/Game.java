@@ -288,7 +288,7 @@ public class Game extends JFrame implements ActionListener
 	 */
 	private void checkChosenCards()
 	{
-		if (firstPickedCard.getPartner() == secondPickedCard)
+		if (firstPickedCard.getName().equals(secondPickedCard.getName()))
 			changeState(State.NOTIFYING_CORRECT_MATCH);
 		else
 			changeState(State.NOTIFYING_INCORRECT_MATCH);
@@ -321,7 +321,7 @@ public class Game extends JFrame implements ActionListener
 	}
 
 	/**
-	 * Picks a set of images which which to create pairs of Cards with, and then
+	 * Picks a set of images whith which to create pairs of Cards with, and then
 	 * adds those Cards to the game.
 	 */
 	private void getNewCards()
@@ -372,9 +372,9 @@ public class Game extends JFrame implements ActionListener
 			Card card1 = new Card(imagesToBeUsed[i]);
 			Card card2 = new Card(imagesToBeUsed[i]);
 
-			// Tell each card about its partner
-			card1.setPartner(card2);
-			card2.setPartner(card1);
+			// Assign the pair a unique ID
+			card1.setName(Integer.toString(i));
+			card2.setName(Integer.toString(i));
 
 			// Specify the Game object as the the Cards ActionListener
 			card1.addActionListener(this);
@@ -447,6 +447,12 @@ public class Game extends JFrame implements ActionListener
 		return str1 != null && str2 != null && str1.equals(str2);
 	}
 
+	/**
+	 * Transitions the game into the specifiied state.
+	 *
+	 * @param newState The state to move to the game into
+	 * @return False if the game was already in the state specified
+	 */
 	private boolean changeState(State newState)
 	{
 		boolean changed = newState != state;
@@ -456,14 +462,12 @@ public class Game extends JFrame implements ActionListener
 		switch (newState)
 		{
 			case NOTIFYING_COMPLETE:
-//				for (Card card : cards)
-//					card.setEnabled(true);
 				// There is supposed to be no break here
 			case SOLVED:
 				for (Card card : cards)
 				{
 					if (card.getState() != Card.State.MATCHED)
-						card.setBackground(Card.redColour);
+						card.setBackground(Card.RED_COLOUR);
 					card.turnToFaceUp();
 				}
 				solve.setEnabled(false);
@@ -475,18 +479,20 @@ public class Game extends JFrame implements ActionListener
 
 				clearUnmatchedFaceUpCards();
 				updateScore(MatchType.HIT);
+				
 				if (state != State.NOTIFYING_COMPLETE)
 					changeState(State.WAITING_FOR_FIRST_CARD);
 				break;
 			case NOTIFYING_INCORRECT_MATCH:
-				firstPickedCard.setBackground(Card.redColour);
-				secondPickedCard.setBackground(Card.redColour);
+				firstPickedCard.setBackground(Card.RED_COLOUR);
+				secondPickedCard.setBackground(Card.RED_COLOUR);
 				updateScore(MatchType.MISS);
 				// Start the timer in order to wait before flipping the mismatched
 				// cards back over.
 				incorrectMatchTimeout.restart();
 				break;
 			case WAITING_FOR_FIRST_CARD:
+
 				shuffle.setText(SHUFFLE_NORMAL_TEXT);
 				clearUnmatchedFaceUpCards();
 				firstPickedCard = null;

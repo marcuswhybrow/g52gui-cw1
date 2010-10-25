@@ -26,14 +26,15 @@ public class Card extends JButton
 	public enum State {FACEDOWN, FACEUP, MATCHED}
 	/** The state this Card is currently in */
 	private State state = State.FACEDOWN;
-	/** The Card which is paired with this Card */
-	private Card partner = null;
 	/** The graphic this Card will display once in the FACEUP state */
 	private ImageIcon icon;
 
-	public static Color redColour;
-	public static Color greenColour;
-	public static Color grayColour;
+	/** The red colour used in the game to represent an incorrect match */
+	public static final Color RED_COLOUR = new Color(255,128,128);
+	/** The green colour used in the game to represent a correct match */
+	public static final Color GREEN_COLOUR = new Color(128,200,128);
+	/** The grey colout used in the game to represent a neutral card */
+	public static final Color GRAY_COLOUR = new Color(240,240,240);
 
 	/**
 	 * Accepts a single ImageIcon which sould represent the graphic revealed
@@ -48,28 +49,7 @@ public class Card extends JButton
 		setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, Color.BLACK));
 		setOpaque(true);
 
-		if (redColour == null)
-		{
-			float[] redColourHSB = new float[3];
-			Color.RGBtoHSB(255, 128, 128, redColourHSB);
-			redColour = Color.getHSBColor(redColourHSB[0], redColourHSB[1], redColourHSB[2]);
-		}
-
-		if (greenColour == null)
-		{
-			float[] greenColourHSB = new float[3];
-			Color.RGBtoHSB(128, 255, 128, greenColourHSB);
-			greenColour = Color.getHSBColor(greenColourHSB[0], greenColourHSB[1], greenColourHSB[2]);
-		}
-
-		if (grayColour == null)
-		{
-			float[] grayColourHSB = new float[3];
-			Color.RGBtoHSB(240, 240, 240, grayColourHSB);
-			grayColour = Color.getHSBColor(grayColourHSB[0], grayColourHSB[1], grayColourHSB[2]);
-		}
-
-		setBackground(grayColour);
+		setBackground(GRAY_COLOUR);
 	}
 
 	/**
@@ -121,29 +101,6 @@ public class Card extends JButton
 	}
 
 	/**
-	 * Informs this Card of the Card with which it is paired, its so called
-	 * partner Card which has a grahic which matches this Card's graphic.
-	 *
-	 * @param partner The Card with which this Card is paired
-	 */
-	public void setPartner(Card partner)
-	{
-		this.partner = partner;
-	}
-
-	/**
-	 * Returns the Card which this Card is paried with. Used in order to
-	 * compare the returned Card with another Card the player has chose, if they
-	 * are the same then a match (or hit) has occurred.
-	 *
-	 * @return The Card which is paired with this Card
-	 */
-	public Card getPartner()
-	{
-		return partner;
-	}
-
-	/**
 	 * Inform this Card that it should move into the MATCHED state, altering
 	 * itself visually in order to advertise the fact that it is no longer
 	 * available as a choice.
@@ -151,14 +108,19 @@ public class Card extends JButton
 	public void hasBeenMatched()
 	{
 		state = State.MATCHED;
-		setBackground(greenColour);
+		setBackground(GREEN_COLOUR);
 	}
 
+	/**
+	 * Set the background colour of the Card. If null the colour is set to grey.
+	 *
+	 * @param color The colour to set the background.
+	 */
 	@Override
 	public void setBackground(Color color)
 	{
 		if (color == null)
-			super.setBackground(grayColour);
+			super.setBackground(GRAY_COLOUR);
 		else
 			super.setBackground(color);
 	}
